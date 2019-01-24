@@ -12,21 +12,6 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import SGD
 
-#set seed for reproduction purpose
-from numpy.random import seed
-seed(1)
-
-import tensorflow as tf
-from tensorflow import set_random_seed
-
-set_random_seed(2)
-
-import random as rn
-rn.seed(12345)
-tf.set_random_seed(1234)
-
-#import seaborn as sns
-
 url = "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
 
 names = ["name","MDVP:Fo(Hz)","MDVP:Fhi(Hz)","MDVP:Flo(Hz)","MDVP:Jitter(%)","MDVP:Jitter(Abs)","MDVP:RAP","MDVP:PPQ",
@@ -76,13 +61,6 @@ print('Accuracy over testing data is ', \
 conf_matrix = confusion_matrix(target_test, neural_model.predict_classes(data_test))
 print(conf_matrix)
 
-plt.plot(run_hist_1.history["loss"],'r', marker='.', label="Train Loss")
-plt.plot(run_hist_1.history["val_loss"],'b', marker='.', label="Validation Loss")
-plt.title("Train loss and validation error")
-plt.legend()
-plt.xlabel('Epoch'), plt.ylabel('Error')
-plt.grid()
-
 #model with dropouts
 
 neural_network_d = Sequential()
@@ -107,6 +85,16 @@ print('Accuracy over training data is ', accuracy_score(target_train, \
 
 print('Accuracy over testing data is ', accuracy_score(target_test, \
                                                        neural_network_d.predict_classes(data_test)))
+
+plt.subplot('111')
+plt.plot(run_hist_1.history["loss"],'r', marker='.', label="Train Loss")
+plt.plot(run_hist_1.history["val_loss"],'b', marker='.', label="Validation Loss")
+plt.title("Train loss and validation error")
+plt.legend()
+plt.xlabel('Epoch'), plt.ylabel('Error')
+plt.grid()
+
+plt.show()
 
 plt.plot(run_hist_2.history["loss"],'r', marker='.', label="Train Loss")
 plt.plot(run_hist_2.history["val_loss"],'b', marker='.', label="Validation Loss")
