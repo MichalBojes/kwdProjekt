@@ -1,105 +1,85 @@
-import numpy as np
 import pandas as pd
-
-import matplotlib.pyplot as plt
-
-from sklearn.model_selection import train_test_split
+import warnings
+from time import time
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import SGDClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import f1_score
+from sklearn import svm
 
-from keras.layers import Dropout
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.optimizers import SGD
-
-url = "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
-
-names = ["name","MDVP:Fo(Hz)","MDVP:Fhi(Hz)","MDVP:Flo(Hz)","MDVP:Jitter(%)","MDVP:Jitter(Abs)","MDVP:RAP","MDVP:PPQ",
-         "Jitter:DDP","MDVP:Shimmer","MDVP:Shimmer(dB)","Shimmer:APQ3","Shimmer:APQ5","MDVP:APQ","Shimmer:DDA",
-         "NHR","HNR","status","RPDE","DFA","spread1","spread2","D2","PPE"]
-
-parkinson_df = pd.read_csv(url, names=names) #load CVS data
-
-#load Pandas Dataframe into numpy arrays
-data = parkinson_df.loc[1:,["MDVP:Fo(Hz)","MDVP:Fhi(Hz)","MDVP:Flo(Hz)","MDVP:Jitter(%)","MDVP:Jitter(Abs)","MDVP:RAP","MDVP:PPQ",
-         "Jitter:DDP","MDVP:Shimmer","MDVP:Shimmer(dB)","Shimmer:APQ3","Shimmer:APQ5","MDVP:APQ","Shimmer:DDA",
-         "NHR","HNR","RPDE","DFA","spread1","spread2","D2","PPE"]].values.astype(np.float)
-target = parkinson_df.loc[1:, ['status']].values.astype(np.float)
-
-#standarise data
-data = StandardScaler().fit_transform(data)
-
-data_train, data_test, target_train, target_test = \
-train_test_split(data, target, test_size=0.3, random_state=545)\
+# ignorowanie warningow zwiazanych z roznymi wersjami bibliotek
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 
-neural_model = Sequential([
-    Dense(2, input_shape=(22,), activation="relu"), #why 22 inputs?
-  #  Dense(2, activation="relu"),
-    Dense(1, activation="sigmoid")
-])
+# glowna funkcja trenujaca model, obliczajaca czas trenowania i sprawdzajaca jego skutecznosc
+def train_predict(clf, x_train, y_train, x_test, y_test):
+    print("Trenowanie {}".format(clf.__class__.__name__))
+    start = time()
+    # trenowanie modelu
+    clf.fit(x_train, y_train)
+    end = time()
+    print("Czas trenowania modelu:  {:.4f} sekund".format(end - start))
 
-#show summary of a model
-neural_model.summary()
+    # przewidywanie
+    print("Wynik F - score dla:")
+    y_pred = clf.predict(x_train)
+    print(" - zbioru trenującego: {:.4f}.".format(f1_score(y_train.values, y_pred, pos_label=1)))
+    y_pred = clf.predict(x_test)
+    print(" - zbioru testującego: {:.4f}.".format(f1_score(y_test.values, y_pred, pos_label=1)))
 
-neural_model.compile(SGD(lr = .003), "binary_crossentropy", \
-                     metrics=["accuracy"])
 
-np.random.seed(0)
-run_hist_1 = neural_model.fit(data_train, target_train, epochs=4000,\
-                              validation_data=(data_test, target_test), \
-                              verbose=False, shuffle=False)
+# wczytanie danych
+parkinson_data = pd.read_csv("parkinsons.csv")
+n_patients = parkinson_data.shape[0]
+n_features = parkinson_data.shape[1] - 1
+n_ill = parkinson_data[parkinson_data['status'] == 1].shape[0]
+n_healthy = parkinson_data[parkinson_data['status'] == 0].shape[0]
 
-print("Training neural network...\n")
+print("\nWczytane dane pacjentow:")
+print(" - ilość pacjentów: {}".format(n_patients))
+print(" - ilość cech: {}".format(n_features))
+print(" - ilość pacjentów chorych: {}".format(n_ill))
+print(" - ilość pacjentów zdrowych: {}".format(n_healthy))
 
-print('Accuracy over training data is ', \
-      accuracy_score(target_train, neural_model.predict_classes(data_train)))
+feature_cols = list(parkinson_data.columns[1:16]) + list(parkinson_data.columns[18:])
+target_col = parkinson_data.columns[17]
 
-print('Accuracy over testing data is ', \
-      accuracy_score(target_test, neural_model.predict_classes(data_test)))
+x_all = parkinson_data[feature_cols]
+y_all = parkinson_data[target_col]
 
-conf_matrix = confusion_matrix(target_test, neural_model.predict_classes(data_test))
-print(conf_matrix)
+print("\n")
+print(x_all)
 
-#model with dropouts
+# standaryzacja danych
+x_all = StandardScaler().fit_transform(x_all)
 
-neural_network_d = Sequential()
-neural_network_d.add(Dense(2, activation='relu', input_shape=(22,)))
-neural_network_d.add(Dropout(0.1))
-#neural_network_d.add(Dense(2, activation='relu'))
-#neural_network_d.add(Dropout(0.1))
-neural_network_d.add(Dense(1, activation='sigmoid'))
+# podział na zbiór trenujący i uczący
+x_train, x_test, y_train, y_test = train_test_split(x_all, y_all, test_size=0.2, random_state=545)
 
-neural_network_d.summary()
+print("Zbiór trenujący: {} ".format(x_train.shape[0]))
+print("Zbiór testujący: {} ".format(x_test.shape[0]))
 
-neural_network_d.compile(SGD(lr = .003), "binary_crossentropy", metrics=["accuracy"])
+# wybor klasyfikatorów
+clf_gaussianNB = GaussianNB()
+clf_SVC = svm.SVC(gamma='auto')
+clf_SGD = SGDClassifier(max_iter=1000, loss="hinge")
+clf_gradientB = GradientBoostingClassifier(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0)
 
-run_hist_2 = neural_network_d.fit(data_train, target_train, epochs=4000, \
-                                  validation_data=(data_test, target_test), \
-                                  verbose=False, shuffle=False)
+print("\n-----------------------------------------\n")
+print("Naiwny klasyfikator bayesowski:")
+train_predict(clf_gaussianNB, x_train, y_train, x_test, y_test)
 
-print("Training neural network w dropouts..\n")
+print("\n-----------------------------------------\n")
+print("Maszyna wektorów nośnych:")
+train_predict(clf_SVC, x_train, y_train, x_test, y_test)
 
-print('Accuracy over training data is ', accuracy_score(target_train, \
-                                                        neural_network_d.predict_classes(data_train)))
+print("\n-----------------------------------------\n")
+print("Zrównoleglona optymalizacja stochastyczna:")
+train_predict(clf_SGD, x_train, y_train, x_test, y_test)
 
-print('Accuracy over testing data is ', accuracy_score(target_test, \
-                                                       neural_network_d.predict_classes(data_test)))
-
-plt.subplot('111')
-plt.plot(run_hist_1.history["loss"],'r', marker='.', label="Train Loss")
-plt.plot(run_hist_1.history["val_loss"],'b', marker='.', label="Validation Loss")
-plt.title("Train loss and validation error")
-plt.legend()
-plt.xlabel('Epoch'), plt.ylabel('Error')
-plt.grid()
-
-plt.show()
-
-plt.plot(run_hist_2.history["loss"],'r', marker='.', label="Train Loss")
-plt.plot(run_hist_2.history["val_loss"],'b', marker='.', label="Validation Loss")
-plt.title("Train loss and validation error with dropouts")
-plt.legend()
-plt.grid()
-
-plt.show()
+print("\n-----------------------------------------\n")
+print("Gradient Tree Boosting:")
+train_predict(clf_gradientB, x_train, y_train, x_test, y_test)
